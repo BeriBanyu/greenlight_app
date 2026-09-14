@@ -29,6 +29,9 @@ class _AuthRegisterScreenState
   bool _consentGiven = false;
   String? _errorMessage;
 
+  // Флаг для глазка пароля: false — пароль скрыт, true — показан
+  bool _passwordVisible = false;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -214,11 +217,24 @@ class _AuthRegisterScreenState
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(
+                  obscureText: !_passwordVisible,
+                  decoration: InputDecoration(
                     labelText: 'Пароль',
-                    border: OutlineInputBorder(),
+                    border:
+                        const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _passwordVisible =
+                              !_passwordVisible;
+                        });
+                      },
+                    ),
                   ),
                   validator: (String? value) {
                     final String v =
