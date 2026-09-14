@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import '../services/auth_storage.dart';
+import 'devices_screen.dart';
+
 class AuthVerifyScreen extends StatefulWidget {
   const AuthVerifyScreen({
     super.key,
@@ -73,25 +76,34 @@ class _AuthVerifyScreenState extends State<AuthVerifyScreen> {
             jsonDecode(response.body)
                 as Map<String, dynamic>;
 
-        final String message =
-            (data['message'] as String?) ??
-                'Email успешно подтверждён.';
+        final String? token = data['token'] as String?;
+
+        if (token == null || token.isEmpty) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage =
+                'Сервер не вернул токен авторизации.';
+          });
+          return;
+        }
+
+        await AuthStorage.saveToken(token);
+
+        if (!mounted) {
+          return;
+        }
 
         setState(() {
           _isLoading = false;
         });
 
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text(message),
-            ),
-          );
-
-        // TODO: после появления экрана «Мои светильники»
-        // сохранить token и перейти на DevicesScreen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (BuildContext context) =>
+                const DevicesScreen(),
+          ),
+          (Route<dynamic> route) => false,
+        );
         return;
       }
 
@@ -129,7 +141,6 @@ class _AuthVerifyScreenState extends State<AuthVerifyScreen> {
             },
             body: jsonEncode({
               'email': widget.email,
-              'code': '000000',
             }),
           )
           .timeout(const Duration(seconds: 10));

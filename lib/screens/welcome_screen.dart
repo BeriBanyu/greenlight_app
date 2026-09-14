@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'auth_login_screen.dart';
 import 'auth_register_screen.dart';
 import 'devices_screen.dart';
 
@@ -47,11 +48,10 @@ class WelcomeScreen extends StatelessWidget {
                     height: 52,
                     child: ElevatedButton(
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Вход добавим после подключения сервера',
-                            ),
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (BuildContext context) =>
+                                const AuthLoginScreen(),
                           ),
                         );
                       },
@@ -66,7 +66,7 @@ class WelcomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) =>
+                            builder: (BuildContext context) =>
                                 const AuthRegisterScreen(),
                           ),
                         );
@@ -93,17 +93,21 @@ class WelcomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const DevicesScreen(),
+                            builder: (BuildContext context) =>
+                                const DevicesScreen(),
                           ),
                         );
                       },
                       icon: const Icon(Icons.wifi_rounded),
-                      label: const Text('Продолжить без аккаунта'),
+                      label: const Text(
+                        'Продолжить без аккаунта',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Подключайте и управляйте светильником локально — интернет не требуется.',
+                    'Подключайте и управляйте светильником '
+                    'локально — интернет не требуется.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
