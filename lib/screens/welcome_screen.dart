@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'auth_register_screen.dart';
 import 'devices_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -62,11 +64,10 @@ class WelcomeScreen extends StatelessWidget {
                     height: 52,
                     child: OutlinedButton(
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Регистрацию добавим после подключения сервера',
-                            ),
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const AuthRegisterScreen(),
                           ),
                         );
                       },
