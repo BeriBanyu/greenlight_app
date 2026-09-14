@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'auth_verify_screen.dart';
+
 class AuthRegisterScreen extends StatefulWidget {
   const AuthRegisterScreen({super.key});
 
@@ -13,9 +15,8 @@ class AuthRegisterScreen extends StatefulWidget {
 
 class _AuthRegisterScreenState
     extends State<AuthRegisterScreen> {
-  // Адрес твоего сервера FastAPI
   static const String _apiBaseUrl =
-      'http://45.150.9.50:8000';
+      'https://greenlight-lamp.ru';
 
   final GlobalKey<FormState> _formKey =
       GlobalKey<FormState>();
@@ -27,10 +28,8 @@ class _AuthRegisterScreenState
 
   bool _isLoading = false;
   bool _consentGiven = false;
-  String? _errorMessage;
-
-  // Флаг для глазка пароля: false — пароль скрыт, true — показан
   bool _passwordVisible = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -41,9 +40,8 @@ class _AuthRegisterScreenState
 
   Future<void> _submit() async {
     final FormState? form = _formKey.currentState;
-    if (form == null) return;
 
-    if (!form.validate()) {
+    if (form == null || !form.validate()) {
       return;
     }
 
@@ -61,86 +59,52 @@ class _AuthRegisterScreenState
     });
 
     try {
-      final Uri uri = Uri.parse(
-        '$_apiBaseUrl/auth/register',
-      );
+      final http.Response response = await http
+          .post(
+            Uri.parse('$_apiBaseUrl/auth/register'),
+            headers: {
+              'Content-Type':
+                  'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'email': _emailController.text.trim(),
+              'password':
+                  _passwordController.text.trim(),
+              'consent': true,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
-      final http.Response response =
-          await http
-              .post(
-                uri,
-                headers: {
-                  'Content-Type':
-                      'application/json; charset=utf-8',
-                },
-                body: jsonEncode({
-                  'email':
-                      _emailController.text.trim(),
-                  'password':
-                      _passwordController.text.trim(),
-                  'consent': true,
-                }),
-              )
-              .timeout(
-                const Duration(seconds: 10),
-              );
+      if (!mounted) {
+        return;
+      }
 
       if (response.statusCode == 200) {
-        // Успех: показываем сообщение и потом
-        // будем переходить на экран ввода кода
-        final Map<String, dynamic> data =
-            jsonDecode(response.body)
-                as Map<String, dynamic>;
-
-        final String message =
-            (data['message'] as String?) ??
-                'На почту отправлен код подтверждения.';
-
-        if (!mounted) return;
+        final String email = _emailController.text
+            .trim()
+            .toLowerCase();
 
         setState(() {
           _isLoading = false;
         });
 
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              behavior: SnackBarBehavior.floating,
-              content: Text(message),
-            ),
-          );
-
-        // TODO: сюда позже добавим переход на экран ввода кода
-        // Navigator.of(context).push(
-        //   MaterialPageRoute(
-        //     builder: (_) => AuthVerifyScreen(
-        //       email: _emailController.text.trim(),
-        //     ),
-        //   ),
-        // );
-      } else if (response.statusCode == 409) {
-        // Пользователь уже есть
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'Пользователь с таким email уже зарегистрирован.';
-        });
-      } else if (response.statusCode == 400) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'Некорректные данные. Проверьте email и пароль.';
-        });
-      } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage =
-              'Ошибка сервера: ${response.statusCode}';
-        });
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (BuildContext context) =>
+                AuthVerifyScreen(email: email),
+          ),
+        );
+        return;
       }
-    } catch (error) {
-      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = _readErrorMessage(response);
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _isLoading = false;
@@ -149,6 +113,24 @@ class _AuthRegisterScreenState
             'Проверьте интернет.';
       });
     }
+  }
+
+  String _readErrorMessage(http.Response response) {
+    try {
+      final Map<String, dynamic> data =
+          jsonDecode(response.body)
+              as Map<String, dynamic>;
+
+      final dynamic detail = data['detail'];
+
+      if (detail is String && detail.isNotEmpty) {
+        return detail;
+      }
+    } catch (_) {
+      // Сервер может вернуть не JSON; ниже будет общий текст.
+    }
+
+    return 'Ошибка сервера: ${response.statusCode}';
   }
 
   @override
@@ -202,15 +184,18 @@ class _AuthRegisterScreenState
                     border: OutlineInputBorder(),
                   ),
                   validator: (String? value) {
-                    final String v =
+                    final String email =
                         (value ?? '').trim();
-                    if (v.isEmpty) {
+
+                    if (email.isEmpty) {
                       return 'Укажите email.';
                     }
-                    if (!v.contains('@') ||
-                        !v.contains('.')) {
+
+                    if (!email.contains('@') ||
+                        !email.contains('.')) {
                       return 'Похоже, это не email.';
                     }
+
                     return null;
                   },
                 ),
@@ -223,6 +208,9 @@ class _AuthRegisterScreenState
                     border:
                         const OutlineInputBorder(),
                     suffixIcon: IconButton(
+                      tooltip: _passwordVisible
+                          ? 'Скрыть пароль'
+                          : 'Показать пароль',
                       icon: Icon(
                         _passwordVisible
                             ? Icons.visibility_off
@@ -237,11 +225,13 @@ class _AuthRegisterScreenState
                     ),
                   ),
                   validator: (String? value) {
-                    final String v =
+                    final String password =
                         (value ?? '').trim();
-                    if (v.length < 8) {
+
+                    if (password.length < 8) {
                       return 'Минимум 8 символов.';
                     }
+
                     return null;
                   },
                 ),
@@ -257,6 +247,7 @@ class _AuthRegisterScreenState
                   controlAffinity:
                       ListTileControlAffinity.leading,
                   activeColor: primary,
+                  contentPadding: EdgeInsets.zero,
                   title: const Text(
                     'Я согласен(а) на обработку '
                     'персональных данных и принимаю '
@@ -266,9 +257,7 @@ class _AuthRegisterScreenState
                 if (_errorMessage != null)
                   Padding(
                     padding:
-                        const EdgeInsets.only(
-                      top: 8,
-                    ),
+                        const EdgeInsets.only(top: 8),
                     child: Text(
                       _errorMessage!,
                       style: TextStyle(
@@ -285,8 +274,7 @@ class _AuthRegisterScreenState
                         _isLoading ? null : _submit,
                     style: FilledButton.styleFrom(
                       backgroundColor: primary,
-                      foregroundColor:
-                          Colors.white,
+                      foregroundColor: Colors.white,
                     ),
                     child: _isLoading
                         ? const SizedBox(
@@ -295,8 +283,7 @@ class _AuthRegisterScreenState
                             child:
                                 CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              color:
-                                  Colors.white,
+                              color: Colors.white,
                             ),
                           )
                         : const Text(
